@@ -5,3 +5,7 @@
 *.s#3
 Hardware/Electronics/UV-Led.b#2
 Hardware/Electronics/UV-Led.s#4
+Hardware/Electronics/Control Board.b#2
+Hardware/Electronics/Control Board.brd_
+Hardware/Electronics/Control Board.s#4
+Hardware/Electronics/Control Board.sch_
