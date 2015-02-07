@@ -6,7 +6,7 @@
 <setting alwaysvectorfont="no"/>
 <setting verticaltext="up"/>
 </settings>
-<grid distance="0.05" unitdist="inch" unit="inch" style="lines" multiple="1" display="no" altdistance="0.01" altunitdist="inch" altunit="inch"/>
+<grid distance="0.1" unitdist="inch" unit="inch" style="lines" multiple="1" display="no" altdistance="0.01" altunitdist="inch" altunit="inch"/>
 <layers>
 <layer number="1" name="Top" color="4" fill="1" visible="no" active="no"/>
 <layer number="2" name="Route2" color="1" fill="3" visible="no" active="no"/>
@@ -6080,7 +6080,8 @@ grid 2.54 mm</description>
 <net name="UV-SWITCH" class="0">
 <segment>
 <label x="138.43" y="54.61" size="1.778" layer="95"/>
-<wire x1="154.94" y1="53.34" x2="134.62" y2="53.34" width="0.1524" layer="91"/>
+<wire x1="157.48" y1="53.34" x2="134.62" y2="53.34" width="0.1524" layer="91"/>
+<pinref part="U$1" gate="G$1" pin="A5"/>
 </segment>
 <segment>
 <label x="203.2" y="165.1" size="1.778" layer="95"/>
