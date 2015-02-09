@@ -2,107 +2,261 @@
 #include <ESP8266.h>
 #include <serLCD.h>
 
-#define display_pin A0
+/*******************************
+* Pin definitions
+*******************************/
+#define DISPLAY_PIN   A0
 
-#define padUp_pin 9
-#define padDown_pin 10
-#define padLeft_pin 11
-#define padRight_pin 12
+#define PAD_UP_PIN    9
+#define PAD_DOWN_PIN  10
+#define PAD_LEFT_PIN  11
+#define PAD_RIGHT_PIN 12
 
-#define UVSwitch_pin A5
+#define UV_SWITCH_PIN A5
 
+#define WIFI_RX_PIN 2
+#define WIFI_TX_PIN 3
+#define WIFI_RST_PIN 4
 
 /*******************************
 * General variables
 *******************************/
-#define FirmwareVersion "0.1"
-#define DeviceCategory "UV Exposure Box" 
-int DeviceID = 1; 
-#define DeviceName "UV"
+#define FIRMWARE_VERSION   "0.2"
+#define DEVICE_CATEGORY    "UV Exposure Box" 
+#define DEVICE_NAME        "UV Exposure Box"
+long timerStartedTime = 0;
+long timerLastUpdate   = 0;
+long timerValue       = 10000;         //10 seconds
+boolean timerStarted = false;
 
 /*******************************
 * WiFi Stuff
 *******************************/
-#define wifiRx_pin 2
-#define wifiTx_pin 3
-#define wifiRST_pin 4
-
+#define BAUD 9600
 #define SSID "Interne"
 #define PASS "Mec0mebien"
-ESP8266 wifi(wifiRx_pin, wifiTx_pin, wifiRST_pin);
+#define SERVER_PORT  "5555"
+ESP8266 wifi(WIFI_RX_PIN, WIFI_TX_PIN, WIFI_RST_PIN, BAUD);
 
-serLCD lcd(display_pin);
+
+/*****************************
+* Other devices
+*****************************/
+serLCD lcd(DISPLAY_PIN);
+
+/****************************
+* Control Commands
+****************************/
+#define CMD_UV_ON    "UV:On"
+#define CMD_UV_OFF   "UV:Off"
+#define CMD_UV_TEST  "UV:Test"
+#define CMD_TIMER_ON  "Timer:On"
+#define CMD_TIMER_ON  "Timer:Off"
+
+/****************************
+* Configuration Commands
+****************************/
+#define CMD_WIFI_SSID  "SetSSID"
+#define CMD_WIFI_PASS  "SetPass"
+#define CMD_SET_TIMER  "SetTimer"
+#define CMD_START_TIMER  "StartTimer"
+#define CMD_STOP_TIMER  "StopTimer"
 
 
+  
 void setup() {
-  pinMode(padUp_pin, OUTPUT);
-  pinMode(padDown_pin, OUTPUT);
-  pinMode(padLeft_pin, OUTPUT);
-  pinMode(padRight_pin, OUTPUT);
-  pinMode(wifiRST_pin, OUTPUT);
-  pinMode(UVSwitch_pin, OUTPUT);
+  //Set input pins
+  pinMode(PAD_UP_PIN, INPUT);
+  pinMode(PAD_DOWN_PIN, INPUT);
+  pinMode(PAD_LEFT_PIN, INPUT);
+  pinMode(PAD_RIGHT_PIN, INPUT);
+  //Set output pins
+  pinMode(WIFI_RST_PIN, OUTPUT);
+  pinMode(UV_SWITCH_PIN, OUTPUT);
   
+  //Initialize navite serial port
   Serial.begin(9600);
-    
-  Serial.println(DeviceName);
-  Serial.println(DeviceCategory);
-  Serial.print("V. ");
-  Serial.println(FirmwareVersion);
-  Serial.print("ID: ");
-  Serial.println(DeviceID);
-  
+  wifi.listen();
   lcd.clear();
-  lcd.print(DeviceCategory);
-  lcd.print(" ");
-  lcd.print(FirmwareVersion);
+  delay(1000);
+  bootUp(); 
   
-  UVSwithTest();
-  
-  int Err = -1;
-  String Ans="";
-  
-  Serial.print("Reboot --> ");
-  Err = wifi.WiFiReboot();
-  if (Err == NO_ERROR) {Serial.println("Reboot OK");}
-  else {Serial.println(Err);}
+}
 
-  Serial.print("WiFi Mode --> ");
-  Err = wifi.WiFiMode(1);
-  if (Err == NO_ERROR) {Serial.println("WiFi Mode OK");}
-  else {Serial.println(Err);}
-  
-  Serial.print("Connect --> ");
-  Err = wifi.ConnectWiFi("Interne", "Mec0mebien");
-  if (Err == NO_ERROR) {Serial.println("Connection OK");}
-  else {Serial.println(Err);}
-  
-  Serial.print("Get IP --> ");
-  String IP = wifi.GetIP();
-  Serial.println(IP);
-  
-  lcd.print(" WiFi: Online");
+/************************************
+* printing and reporting
+************************************/
+void lcdAndSerialPrint(String _text) {
+  lcd.print(_text);
+  Serial.println(_text);
 }
 
 /************************************
 * General Functions
 ************************************/
 void loop() {
-
+  receiveCommand();
+  checkUVTimer();
 }
 
-void PrintError(char* ErrorMessage) {
-  Serial.print(Error);
-  Serial.println(ErrorMessage);
+//Bootup sequence
+void bootUp() {
+  int _err = -1;
+  int Err = -1;
+  lcd.clear();
+  lcdAndSerialPrint(DEVICE_NAME);
+  lcd.selectLine(2);
+  lcdAndSerialPrint("Version: ");
+  lcdAndSerialPrint(FIRMWARE_VERSION);
+  
+  delay(1000);
+  lcd.clear();
+  lcdAndSerialPrint("UV Test -> ");
+  UVSwithTest();
+  lcdAndSerialPrint("Done");
+  delay(1000);
+  
+  lcd.clear();
+  lcdAndSerialPrint("Initializing");
+  lcd.selectLine(2);
+  lcdAndSerialPrint("WiFi ESP8266");
+  _err = wifi.InitWiFi(SSID, PASS);
+  if(_err != NO_ERROR) {
+    lcdAndSerialPrint("Error: ");
+    lcdAndSerialPrint(String(_err));
   }
+  
+  else{
+    lcd.clear();
+    lcdAndSerialPrint("Connected: ");
+    lcd.selectLine(2);
+    lcdAndSerialPrint(wifi.IP);
+  }
+  
+  delay(2000);
+  
+   _err = wifi.SetServer(SERVER_PORT);
+  if(_err != NO_ERROR) {
+    lcd.clear();
+    lcdAndSerialPrint("Error: ");
+    lcdAndSerialPrint(String(_err));
+  }
+  
+  else{
+    lcd.clear();
+    lcdAndSerialPrint("Server OK: ");
+    lcdAndSerialPrint(wifi.ServerPort);
+    
+    delay(1000);
+    lcd.clear();
+    lcdAndSerialPrint(DEVICE_NAME);
+    lcd.selectLine(2);
+    lcdAndSerialPrint("     ONLINE");  
+  }    
+}
 
 
 /**************************************************************************************
+* Command functions
+***************************************************************************************/
+int receiveCommand() {
+  String _cmd = wifi.ReadCmd();
+  if (_cmd == "") return false;
+  if (_cmd == CMD_UV_ON)                  return SetUV(true);
+  else if (_cmd == CMD_UV_OFF)            return SetUV(false);
+  else if (_cmd == CMD_UV_TEST)           return UVSwithTest();
+  else if (contains(_cmd, CMD_SET_TIMER))  return setTimer(extractParam(_cmd).toInt());
+  else if (_cmd == CMD_START_TIMER)           return startTimer();
+  else if (_cmd == CMD_STOP_TIMER)           return stopTimer();
+  else return false;
+}
+
+boolean contains(String original, String search) {
+    int _searchLength = search.length();
+	int _max = original.length() - _searchLength;
+    for (int i = 0; i <= _max; i++) {
+        if (original.substring(i, i+_searchLength) == search) {return true;}
+    }
+    return false;
+} 
+
+//Extracts the value of a parameter from the '=' separator till the end
+String extractParam(String _cmd) {
+  int _separatorIndex = _cmd.indexOf('=') + 1;
+  return _cmd.substring(_separatorIndex);
+  }
+/**************************************************************************************
 * UV-LED Functions
 ***************************************************************************************/
-void UVSwithTest() {
-  for (int i=0; i<6; i++) {
-   digitalWrite(UVSwitch_pin, !digitalRead(UVSwitch_pin));
-   delay(500);
+boolean UVSwithTest() {
+  for (int i=0; i<4; i++) {
+   digitalWrite(UV_SWITCH_PIN, !digitalRead(UV_SWITCH_PIN));
+   delay(200);
    }
+  return true;
 }
+
+boolean SetUV(boolean _state) {
+   digitalWrite(UV_SWITCH_PIN, _state);
+   GetUV();
+   if (digitalRead(UV_SWITCH_PIN)== _state) return true;
+   else return false;
+}
+
+boolean GetUV() {
+  boolean _state = digitalRead(UV_SWITCH_PIN);
+  lcd.setCursor(2,16);
+  lcd.print(_state);
+  return _state;
+}
+
+void ToggleUV() {
+  digitalWrite(UV_SWITCH_PIN, !digitalRead(UV_SWITCH_PIN));
+}
+
+void checkUVTimer() {
+  if (timerStarted == true) {
+    long _now = millis();
+        
+    if (_now > (timerStartedTime + timerValue - 1000)) {
+      SetUV(false);
+      timerStarted = false;
+      lcd.clear();
+      lcdAndSerialPrint("Exposure DONE");
+    }
+    
+    else if (_now >= timerLastUpdate + 1000) {  //Every second print remaining time
+      timerLastUpdate = _now;
+      lcd.setCursor(2,1);
+      lcd.print("               ");
+      lcd.setCursor(2,1);
+      lcdAndSerialPrint(String((timerStartedTime + timerValue - _now)/1000));
+    }  
+  }
+}
+  
+
+boolean setTimer(int _time) {
+  timerValue = _time;
+  timerValue = timerValue * 1000;  //time converted to ms
+  lcd.setCursor(2,1);
+  lcd.print("               ");
+  lcd.setCursor(2,1);
+  lcdAndSerialPrint(String(timerValue/1000));
+  return true;
+}
+  
+boolean startTimer() {
+    timerStarted = true;
+    timerStartedTime=millis();
+    SetUV(true);
+    return true;
+  }
+
+boolean stopTimer() {
+    timerStarted = false;
+    SetUV(false);
+    return true;
+  }
+
 
