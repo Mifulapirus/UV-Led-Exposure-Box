@@ -29,6 +29,11 @@ long timerLastUpdate   = 0;
 long timerValue       = 10000;         //10 seconds
 boolean timerStarted = false;
 
+/*****************************
+* Other devices
+*****************************/
+serLCD lcd(DISPLAY_PIN);
+
 /*******************************
 * WiFi Stuff
 *******************************/
@@ -37,12 +42,6 @@ boolean timerStarted = false;
 #define PASS "Mec0mebien"
 #define SERVER_PORT  "5555"
 ESP8266 wifi(WIFI_RX_PIN, WIFI_TX_PIN, WIFI_RST_PIN, BAUD);
-
-
-/*****************************
-* Other devices
-*****************************/
-serLCD lcd(DISPLAY_PIN);
 
 /****************************
 * Control Commands
@@ -63,7 +62,9 @@ serLCD lcd(DISPLAY_PIN);
 #define CMD_STOP_TIMER  "StopTimer"
 
 
-  
+/************************************
+* Setup and initializations
+************************************/  
 void setup() {
   //Set input pins
   pinMode(PAD_UP_PIN, INPUT);
@@ -76,12 +77,11 @@ void setup() {
   
   //Initialize navite serial port
   Serial.begin(9600);
-  wifi.listen();
   lcd.clear();
   delay(1000);
   bootUp(); 
-  
 }
+
 
 /************************************
 * printing and reporting
@@ -90,6 +90,7 @@ void lcdAndSerialPrint(String _text) {
   lcd.print(_text);
   Serial.println(_text);
 }
+
 
 /************************************
 * General Functions
@@ -120,10 +121,11 @@ void bootUp() {
   lcdAndSerialPrint("Initializing");
   lcd.selectLine(2);
   lcdAndSerialPrint("WiFi ESP8266");
-  _err = wifi.InitWiFi(SSID, PASS);
+  _err = wifi.init(SSID, PASS);
   if(_err != NO_ERROR) {
     lcdAndSerialPrint("Error: ");
     lcdAndSerialPrint(String(_err));
+    delay(3000);
   }
   
   else{
@@ -131,11 +133,10 @@ void bootUp() {
     lcdAndSerialPrint("Connected: ");
     lcd.selectLine(2);
     lcdAndSerialPrint(wifi.IP);
+    delay(2000);  
   }
-  
-  delay(2000);
-  
-   _err = wifi.SetServer(SERVER_PORT);
+     
+  _err = wifi.setServer(SERVER_PORT);
   if(_err != NO_ERROR) {
     lcd.clear();
     lcdAndSerialPrint("Error: ");
@@ -145,7 +146,7 @@ void bootUp() {
   else{
     lcd.clear();
     lcdAndSerialPrint("Server OK: ");
-    lcdAndSerialPrint(wifi.ServerPort);
+    lcdAndSerialPrint(wifi.serverPort);
     
     delay(1000);
     lcd.clear();
@@ -160,22 +161,22 @@ void bootUp() {
 * Command functions
 ***************************************************************************************/
 int receiveCommand() {
-  String _cmd = wifi.ReadCmd();
+  String _cmd = wifi.readCmd();
   if (_cmd == "") return false;
-  if (_cmd == CMD_UV_ON)                  return SetUV(true);
-  else if (_cmd == CMD_UV_OFF)            return SetUV(false);
+  if (_cmd == CMD_UV_ON)                  return setUV(true);
+  else if (_cmd == CMD_UV_OFF)            return setUV(false);
   else if (_cmd == CMD_UV_TEST)           return UVSwithTest();
-  else if (contains(_cmd, CMD_SET_TIMER))  return setTimer(extractParam(_cmd).toInt());
-  else if (_cmd == CMD_START_TIMER)           return startTimer();
-  else if (_cmd == CMD_STOP_TIMER)           return stopTimer();
+  else if (contains(_cmd, CMD_SET_TIMER)) return setTimer(extractParam(_cmd).toInt());
+  else if (_cmd == CMD_START_TIMER)       return startTimer();
+  else if (_cmd == CMD_STOP_TIMER)        return stopTimer();
   else return false;
 }
 
-boolean contains(String original, String search) {
-    int _searchLength = search.length();
-	int _max = original.length() - _searchLength;
+boolean contains(String _original, String _search) {
+    int _searchLength = _search.length();
+	int _max = _original.length() - _searchLength;
     for (int i = 0; i <= _max; i++) {
-        if (original.substring(i, i+_searchLength) == search) {return true;}
+        if (_original.substring(i, i+_searchLength) == _search) {return true;}
     }
     return false;
 } 
@@ -184,7 +185,9 @@ boolean contains(String original, String search) {
 String extractParam(String _cmd) {
   int _separatorIndex = _cmd.indexOf('=') + 1;
   return _cmd.substring(_separatorIndex);
-  }
+}
+
+  
 /**************************************************************************************
 * UV-LED Functions
 ***************************************************************************************/
@@ -192,25 +195,25 @@ boolean UVSwithTest() {
   for (int i=0; i<4; i++) {
    digitalWrite(UV_SWITCH_PIN, !digitalRead(UV_SWITCH_PIN));
    delay(200);
-   }
+  }
   return true;
 }
 
-boolean SetUV(boolean _state) {
+boolean setUV(boolean _state) {
    digitalWrite(UV_SWITCH_PIN, _state);
-   GetUV();
+   getUV();
    if (digitalRead(UV_SWITCH_PIN)== _state) return true;
    else return false;
 }
 
-boolean GetUV() {
+boolean getUV() {
   boolean _state = digitalRead(UV_SWITCH_PIN);
   lcd.setCursor(2,16);
   lcd.print(_state);
   return _state;
 }
 
-void ToggleUV() {
+void toggleUV() {
   digitalWrite(UV_SWITCH_PIN, !digitalRead(UV_SWITCH_PIN));
 }
 
@@ -219,7 +222,7 @@ void checkUVTimer() {
     long _now = millis();
         
     if (_now > (timerStartedTime + timerValue - 1000)) {
-      SetUV(false);
+      setUV(false);
       timerStarted = false;
       lcd.clear();
       lcdAndSerialPrint("Exposure DONE");
@@ -234,7 +237,6 @@ void checkUVTimer() {
     }  
   }
 }
-  
 
 boolean setTimer(int _time) {
   timerValue = _time;
@@ -249,14 +251,14 @@ boolean setTimer(int _time) {
 boolean startTimer() {
     timerStarted = true;
     timerStartedTime=millis();
-    SetUV(true);
+    setUV(true);
     return true;
-  }
+}
 
 boolean stopTimer() {
     timerStarted = false;
-    SetUV(false);
+    setUV(false);
     return true;
-  }
+}
 
 
