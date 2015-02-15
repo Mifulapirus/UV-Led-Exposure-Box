@@ -5,7 +5,7 @@
 /*******************************
 * Pin definitions
 *******************************/
-#define DISPLAY_PIN   A0
+#define DISPLAY_PIN   A1
 
 #define PAD_UP_PIN    9
 #define PAD_DOWN_PIN  10
@@ -51,15 +51,16 @@ ESP8266 wifi(WIFI_RX_PIN, WIFI_TX_PIN, WIFI_RST_PIN, BAUD);
 #define CMD_UV_TEST  "UV:Test"
 #define CMD_TIMER_ON  "Timer:On"
 #define CMD_TIMER_ON  "Timer:Off"
+#define CMD_SET_TIMER  "SetTimer"
+#define CMD_START_TIMER  "StartTimer"
+#define CMD_STOP_TIMER  "StopTimer"
 
 /****************************
 * Configuration Commands
 ****************************/
 #define CMD_WIFI_SSID  "SetSSID"
 #define CMD_WIFI_PASS  "SetPass"
-#define CMD_SET_TIMER  "SetTimer"
-#define CMD_START_TIMER  "StartTimer"
-#define CMD_STOP_TIMER  "StopTimer"
+
 
 
 /************************************
